@@ -1,111 +1,92 @@
-const { getStreamsFromAttachment } = global.utils;
-const moment = require("moment-timezone");
+module.exports = { 
+  config: { 
+    name: "p", 
+    version: "1.0", 
+    author: "BaYjid 👽", 
+    countDown: 5, 
+    role: 2, 
+    shortDescription: { vi: "", en: "" }, 
+    longDescription: { vi: "", en: "" }, 
+    category: "pending" 
+  },
 
-module.exports = {
-	config: {
-		name: "notification",
-		aliases: ["notify", "noti"],
-		version: "2.0",
-		author: "NTKhang | Modified by Azad Vai",
-		countDown: 5,
-		role: 2,
-		description: {
-			vi: "Gửi thông báo từ admin đến tất cả các nhóm",
-			en: "Send a stylish notification from admin to all groups"
-		},
-		category: "owner",
-		guide: {
-			en: "{pn} <your message>"
-		},
-		envConfig: {
-			delayPerGroup: 250
-		}
-	},
+  langs: { 
+    en: { 
+      invalidNumber: "❎ 『%1』 is not a valid number!", 
+      cancelSuccess: "❎ Refused 『%1』 thread(s)!", 
+      approveSuccess: "✅ Approved 『%1』 thread(s) successfully!", 
+      cantGetPendingList: "⚠️ Can't get the pending list!", 
+      returnListPending: "☢️『PENDING』☢️\n\n❮ Total threads to approve: 『%1』❯\n\n%2", 
+      returnListClean: "↪️『PENDING』↩️\nNo pending threads found!"
+    } 
+  },
 
-	langs: {
-		en: {
-			missingMessage: "⚠️ Please enter the message you want to send to all groups",
-			sendingNotification: "🚀 Sending notification to %1 groups...",
-			sentNotification: "✅ Successfully sent notification to %1 groups!",
-			errorSendingNotification: "❌ Failed to send to %1 groups:\n%2"
-		}
-	},
+  onReply: async function ({ api, event, Reply, getLang }) { 
+    if (String(event.senderID) !== String(Reply.author)) return; 
+    const { body, threadID, messageID } = event; 
+    let count = 0;
 
-	onStart: async function ({ message, api, event, args, commandName, envCommands, threadsData, getLang }) {
-		const { delayPerGroup } = envCommands[commandName];
+    const isCancel = body.toLowerCase().startsWith("c") || body.toLowerCase().startsWith("cancel");
+    const indices = body.replace(/^[cC]ancel?\s*/, "").split(/\s+/);
 
-		if (!args[0]) return message.reply(getLang("missingMessage"));
+    for (const index of indices) {
+      const num = parseInt(index);
+      if (isNaN(num) || num <= 0 || num > Reply.pending.length) {
+        return api.sendMessage(getLang("invalidNumber", num), threadID, messageID);
+      }
 
-		const allThreads = (await threadsData.getAll()).filter(
-			t => t.isGroup && t.members.find(m => m.userID == api.getCurrentUserID())?.inGroup
-		);
+      if (isCancel) {
+        api.removeUserFromGroup(api.getCurrentUserID(), Reply.pending[num - 1].threadID);
+      } else {
+        const prefix = global.utils.getPrefix(Reply.pending[num - 1].threadID); // Prefix Get
 
-		message.reply(getLang("sendingNotification", allThreads.length));
+        api.sendMessage(
+          `╔════════════════╗\n` +
+          `║💻 ᴀᴢᴀᴅ ᴄʜᴀᴛ ʙᴏᴛ 💻\n` +
+          `╚════════════════╝\n\n` +
+          `🗿 𝗧𝗵𝗮𝗻𝗸 𝘆𝗼𝘂 𝗳𝗼𝗿 𝗶𝗻𝘃𝗶𝘁𝗶𝗻𝗴 𝗺𝗲! 🌟\n\n` +
+          `💱 𝗟𝗲𝘁'𝘀 𝗴𝗲𝘁 𝘀𝘁𝗮𝗿𝘁𝗲𝗱!\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `⚔️ 𝗕𝗼𝘁 𝗣𝗿𝗲𝗳𝗶𝘅: 『 ${prefix} 』\n` +
+          `📌 𝗖𝗵𝗲𝗰𝗸 𝗖𝗼𝗺𝗺𝗮𝗻𝗱𝘀: 『 ${prefix}help 』\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `⚒️ 𝗡𝗲𝗲𝗱 𝗛𝗲𝗹𝗽? 𝗝𝘂𝘀𝘁 𝗔𝘀𝗸! 🚀`,
+          Reply.pending[num - 1].threadID
+        );
+      }
+      count++;
+    }
 
-		const currentTime = moment.tz("Asia/Dhaka").format("DD/MM/YYYY hh:mm A");
+    return api.sendMessage(getLang(isCancel ? "cancelSuccess" : "approveSuccess", count), threadID, messageID);
+  },
 
-		const formSend = {
-			body: [
-				"💌 𝗕𝗢𝗧 𝗡𝗢𝗧𝗜𝗙𝗜𝗖𝗔𝗧𝗜𝗢𝗡",
-				"──────────────────────",
-				`🕐 Time: ${currentTime}`,
-				"🌐 From: Admin Bot",
-				`✉️ Message:\n${args.join(" ")}`,
-				"──────────────────────",
-				"🤖 Powered by Azad Vai"
-			].join("\n"),
+  onStart: async function ({ api, event, getLang, commandName }) { 
+    const { threadID, messageID } = event; 
+    let msg = "", index = 1;
 
-			attachment: await getStreamsFromAttachment(
-				[
-					...event.attachments,
-					...(event.messageReply?.attachments || [])
-				].filter(item => ["photo", "png", "animated_image", "video", "audio"].includes(item.type))
-			)
-		};
+    try {
+      const spam = (await api.getThreadList(100, null, ["OTHER"])) || [];
+      const pending = (await api.getThreadList(100, null, ["PENDING"])) || [];
+      const list = [...spam, ...pending].filter(group => group.isSubscribed && group.isGroup);
 
-		let sendSuccess = 0;
-		const sendError = [];
-		const waitingSend = [];
+      for (const BaYjid of list) {
+        msg += `🔹『${index++}』 ${BaYjid.name} 『${BaYjid.threadID}』\n`;
+      }
 
-		for (const thread of allThreads) {
-			try {
-				waitingSend.push({
-					threadID: thread.threadID,
-					pending: api.sendMessage(formSend, thread.threadID)
-				});
-				await new Promise(resolve => setTimeout(resolve, delayPerGroup));
-			} catch (e) {
-				sendError.push(thread.threadID);
-			}
-		}
-
-		for (const sended of waitingSend) {
-			try {
-				await sended.pending;
-				sendSuccess++;
-			} catch (e) {
-				const { errorDescription } = e;
-				const existing = sendError.find(item => item.errorDescription == errorDescription);
-				if (existing) {
-					existing.threadIDs.push(sended.threadID);
-				} else {
-					sendError.push({
-						threadIDs: [sended.threadID],
-						errorDescription
-					});
-				}
-			}
-		}
-
-		let msg = "";
-		if (sendSuccess > 0)
-			msg += getLang("sentNotification", sendSuccess) + "\n";
-		if (sendError.length > 0)
-			msg += getLang(
-				"errorSendingNotification",
-				sendError.reduce((a, b) => a + b.threadIDs.length, 0),
-				sendError.reduce((a, b) => a + `\n❌ ${b.errorDescription}:\n   ➤ ${b.threadIDs.join("\n   ➤ ")}`, "")
-			);
-		message.reply(msg);
-	}
+      if (list.length !== 0) {
+        return api.sendMessage(getLang("returnListPending", list.length, msg), threadID, (err, info) => {
+          global.GoatBot.onReply.set(info.messageID, {
+            commandName,
+            messageID: info.messageID,
+            author: event.senderID,
+            pending: list
+          });
+        }, messageID);
+      } else {
+        return api.sendMessage(getLang("returnListClean"), threadID, messageID);
+      }
+    } catch (e) {
+      return api.sendMessage(getLang("cantGetPendingList"), threadID, messageID);
+    }
+  }
 };
