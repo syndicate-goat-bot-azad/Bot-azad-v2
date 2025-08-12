@@ -164,4 +164,4 @@ async function saveChanges(message, event, threadID, senderID, threadsData, getL
 		data
 	});
 	message.reply(getLang("addedFile", attachments.length));
-}
+	}
