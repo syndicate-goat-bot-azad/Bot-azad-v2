@@ -1,167 +1,104 @@
-const { drive, getStreamFromURL, getExtFromUrl, getTime } = global.utils;
+const fs = require("fs-extra");
+const axios = require("axios");
+const path = require("path");
+const { createCanvas, loadImage } = require("canvas");
+const moment = require("moment-timezone");
 
 module.exports = {
-	config: {
-		name: "setwelcome",
-		aliases: ["setwc"],
-		version: "1.7",
-		author: "NTKhang",
-		countDown: 5,
-		role: 1,
-		description: {
-			vi: "Chỉnh sửa nội dung tin nhắn chào mừng thành viên mới tham gia vào nhóm chat của bạn",
-			en: "Edit welcome message content when new member join your group chat"
-		},
-		category: "custom",
-		guide: {
-			vi: {
-				body: "   {pn} text [<nội dung> | reset]: chỉnh sửa nội dung văn bản hoặc reset về mặc định, với những shortcut có sẵn:"
-					+ "\n  + {userName}: tên của thành viên mới"
-					+ "\n  + {userNameTag}: tên của thành viên mới (tag)"
-					+ "\n  + {boxName}:  tên của nhóm chat"
-					+ "\n  + {multiple}: bạn || các bạn"
-					+ "\n  + {session}:  buổi trong ngày"
-					+ "\n\n   Ví dụ:"
-					+ "\n    {pn} text Hello {userName}, welcome to {boxName}, chúc {multiple} một ngày mới vui vẻ"
-					+ "\n"
-					+ "\n   Reply (phản hồi) hoặc gửi kèm một tin nhắn có file với nội dung {pn} file: để thêm tệp đính kèm vào tin nhắn chào mừng (ảnh, video, audio)"
-					+ "\n\n   Ví dụ:"
-					+ "\n    {pn} file reset: xóa gửi file",
-				attachment: {
-					[`${__dirname}/assets/guide/setwelcome/setwelcome_vi_1.png`]: "https://i.ibb.co/vd6bQrW/setwelcome-vi-1.png"
-				}
-			},
-			en: {
-				body: "   {pn} text [<content> | reset]: edit text content or reset to default, with some shortcuts:"
-					+ "\n  + {userName}: new member name"
-					+ "\n  + {userNameTag}: new member name (tag)"
-					+ "\n  + {boxName}:  group chat name"
-					+ "\n  + {multiple}: you || you guys"
-					+ "\n  + {session}:  session in day"
-					+ "\n\n   Example:"
-					+ "\n    {pn} text Hello {userName}, welcome to {boxName}, have a nice day {multiple}"
-					+ "\n"
-					+ "\n   Reply (phản hồi) or send a message with file with content {pn} file: to add file attachments to welcome message (image, video, audio)"
-					+ "\n\n   Example:"
-					+ "\n    {pn} file reset: delete file attachments",
-				attachment: {
-					[`${__dirname}/assets/guide/setwelcome/setwelcome_en_1.png`]: "https://i.ibb.co/vsCz0ks/setwelcome-en-1.png"
-				}
-			}
-		}
-	},
+  config: {
+    name: "welcome",
+    version: "3.1",
+    author: "Azad Vai x Fahad",
+    role: 0,
+    shortDescription: "Stylish welcome message",
+    longDescription: "Creates a neon welcome card for new members with profile pic and time.",
+    category: "group",
+    guide: { en: "{pn}" }
+  },
 
-	langs: {
-		vi: {
-			turnedOn: "Đã bật chức năng chào mừng thành viên mới",
-			turnedOff: "Đã tắt chức năng chào mừng thành viên mới",
-			missingContent: "Vui lùng nhập nội dung tin nhắn",
-			edited: "Đã chỉnh sửa nội dung tin nhắn chào mừng của nhóm bạn thành: %1",
-			reseted: "Đã reset nội dung tin nhắn chào mừng",
-			noFile: "Không có tệp đính kèm tin nhắn chào mừng nào để xóa",
-			resetedFile: "Đã reset tệp đính kèm thành công",
-			missingFile: "Hãy phản hồi tin nhắn này kèm file ảnh/video/audio",
-			addedFile: "Đã thêm %1 tệp đính kèm vào tin nhắn chào mừng của nhóm bạn"
-		},
-		en: {
-			turnedOn: "Turned on welcome message",
-			turnedOff: "Turned off welcome message",
-			missingContent: "Please enter welcome message content",
-			edited: "Edited welcome message content of your group to: %1",
-			reseted: "Reseted welcome message content",
-			noFile: "No file attachments to delete",
-			resetedFile: "Reseted file attachments successfully",
-			missingFile: "Please reply this message with image/video/audio file",
-			addedFile: "Added %1 file attachments to your group welcome message"
-		}
-	},
+  onStart: async function () {
+    console.log("✅ welcome.js (neon canvas version) loaded");
+  },
 
-	onStart: async function ({ args, threadsData, message, event, commandName, getLang }) {
-		const { threadID, senderID, body } = event;
-		const { data, settings } = await threadsData.get(threadID);
+  onEvent: async function ({ event, message, threadsData }) {
+    if (event.logMessageType !== "log:subscribe") return;
 
-		switch (args[0]) {
-			case "text": {
-				if (!args[1])
-					return message.reply(getLang("missingContent"));
-				else if (args[1] == "reset")
-					delete data.welcomeMessage;
-				else
-					data.welcomeMessage = body.slice(body.indexOf(args[0]) + args[0].length).trim();
-				await threadsData.set(threadID, {
-					data
-				});
-				message.reply(data.welcomeMessage ? getLang("edited", data.welcomeMessage) : getLang("reseted"));
-				break;
-			}
-			case "file": {
-				if (args[1] == "reset") {
-					const { welcomeAttachment } = data;
-					if (!welcomeAttachment)
-						return message.reply(getLang("noFile"));
-					try {
-						await Promise.all(data.welcomeAttachment.map(fileId => drive.deleteFile(fileId)));
-						delete data.welcomeAttachment;
-					}
-					catch (e) { }
-					await threadsData.set(threadID, {
-						data
-					});
-					message.reply(getLang("resetedFile"));
-				}
-				else if (event.attachments.length == 0 && (!event.messageReply || event.messageReply.attachments.length == 0))
-					return message.reply(getLang("missingFile"), (err, info) => {
-						global.GoatBot.onReply.set(info.messageID, {
-							messageID: info.messageID,
-							author: senderID,
-							commandName
-						});
-					});
-				else {
-					saveChanges(message, event, threadID, senderID, threadsData, getLang);
-				}
-				break;
-			}
-			case "on":
-			case "off": {
-				settings.sendWelcomeMessage = args[0] == "on";
-				await threadsData.set(threadID, { settings });
-				message.reply(settings.sendWelcomeMessage ? getLang("turnedOn") : getLang("turnedOff"));
-				break;
-			}
-			default:
-				message.SyntaxError();
-				break;
-		}
-	},
+    const threadID = event.threadID;
+    const addedUsers = event.logMessageData.addedParticipants;
+    const threadInfo = await threadsData.get(threadID);
+    const groupName = threadInfo.threadName || "your group";
 
-	onReply: async function ({ event, Reply, message, threadsData, getLang }) {
-		const { threadID, senderID } = event;
-		if (senderID != Reply.author)
-			return;
+    for (const user of addedUsers) {
+      const userID = user.userFbId || user.userID;
+      const userName = user.fullName || "Friend";
+      const time = moment().tz("Asia/Dhaka").format("hh:mm A - MMM Do YYYY");
 
-		if (event.attachments.length == 0 && (!event.messageReply || event.messageReply.attachments.length == 0))
-			return message.reply(getLang("missingFile"));
-		saveChanges(message, event, threadID, senderID, threadsData, getLang);
-	}
+      const avatarURL = `https://graph.facebook.com/${userID}/picture?width=800&height=800&access_token=350685531728|62f8ce9f74b12f84c123cc23437a4a32`;
+
+      const cache = path.join(__dirname, "cache");
+      fs.ensureDirSync(cache);
+      const cardPath = path.join(cache, `${userID}_welcome.png`);
+
+      try {
+        // Fetch and load avatar directly
+        const { data } = await axios.get(avatarURL, { responseType: "arraybuffer" });
+        const avatar = await loadImage(data);
+
+        // Create canvas (bigger)
+        const canvas = createCanvas(800, 400);
+        const ctx = canvas.getContext("2d");
+
+        // Background
+        ctx.fillStyle = "#111118";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Bigger neon avatar
+        const centerX = 200, centerY = 200, radius = 120;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius + 10, 0, Math.PI * 2);
+        ctx.shadowColor = "#00ffff";
+        ctx.shadowBlur = 40;
+        ctx.strokeStyle = "#00ffff";
+        ctx.lineWidth = 8;
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(avatar, centerX - radius, centerY - radius, radius * 2, radius * 2);
+        ctx.restore();
+
+        // Only name
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 40px Arial";
+        ctx.fillText(userName, 400, 180);
+
+        ctx.fillStyle = "#00ffff";
+        ctx.font = "24px Arial";
+        ctx.fillText(`📌 ${groupName}`, 400, 230);
+
+        ctx.fillStyle = "#dddddd";
+        ctx.fillText(`🕓 ${time}`, 400, 280);
+
+        const buffer = canvas.toBuffer("image/png");
+        fs.writeFileSync(cardPath, buffer);
+
+        await message.send({
+          body: `✨ ${userName} joined ${groupName}!`,
+          attachment: fs.createReadStream(cardPath)
+        });
+
+        // Cleanup
+        if (fs.existsSync(cardPath)) fs.unlink(cardPath, () => {});
+      } catch (err) {
+        console.error("❌ Error sending welcome image:", err);
+        await message.send(`👋 ${userName}\n📌 ${groupName}\n🕓 ${time}`);
+      }
+    }
+  }
 };
-
-async function saveChanges(message, event, threadID, senderID, threadsData, getLang) {
-	const { data } = await threadsData.get(threadID);
-	const attachments = [...event.attachments, ...(event.messageReply?.attachments || [])].filter(item => ["photo", 'png', "animated_image", "video", "audio"].includes(item.type));
-	if (!data.welcomeAttachment)
-		data.welcomeAttachment = [];
-
-	await Promise.all(attachments.map(async attachment => {
-		const { url } = attachment;
-		const ext = getExtFromUrl(url);
-		const fileName = `${getTime()}.${ext}`;
-		const infoFile = await drive.uploadFile(`setwelcome_${threadID}_${senderID}_${fileName}`, await getStreamFromURL(url));
-		data.welcomeAttachment.push(infoFile.id);
-	}));
-
-	await threadsData.set(threadID, {
-		data
-	});
-	message.reply(getLang("addedFile", attachments.length));
-	}
