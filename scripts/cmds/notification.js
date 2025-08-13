@@ -1,92 +1,100 @@
-module.exports = { 
-  config: { 
-    name: "p", 
-    version: "1.0", 
-    author: "BaYjid 👽", 
-    countDown: 5, 
-    role: 2, 
-    shortDescription: { vi: "", en: "" }, 
-    longDescription: { vi: "", en: "" }, 
-    category: "pending" 
-  },
+const { getStreamsFromAttachment } = global.utils;
 
-  langs: { 
-    en: { 
-      invalidNumber: "❎ 『%1』 is not a valid number!", 
-      cancelSuccess: "❎ Refused 『%1』 thread(s)!", 
-      approveSuccess: "✅ Approved 『%1』 thread(s) successfully!", 
-      cantGetPendingList: "⚠️ Can't get the pending list!", 
-      returnListPending: "☢️『PENDING』☢️\n\n❮ Total threads to approve: 『%1』❯\n\n%2", 
-      returnListClean: "↪️『PENDING』↩️\nNo pending threads found!"
-    } 
-  },
+module.exports = {
+	config: {
+		name: "notification",
+		aliases: ["notify", "noti"],
+		version: "1.7",
+		author: "NTKhang",
+		countDown: 5,
+		role: 2,
+		description: {
+			vi: "Gửi thông báo từ admin đến all box",
+			en: "Send notification from admin to all box"
+		},
+		category: "owner",
+		guide: {
+			en: "{pn} <tin nhắn>"
+		},
+		envConfig: {
+			delayPerGroup: 250
+		}
+	},
 
-  onReply: async function ({ api, event, Reply, getLang }) { 
-    if (String(event.senderID) !== String(Reply.author)) return; 
-    const { body, threadID, messageID } = event; 
-    let count = 0;
+	langs: {
+		vi: {
+			missingMessage: "Vui lòng nhập tin nhắn bạn muốn gửi đến tất cả các nhóm",
+			notification: "Thông báo từ admin bot đến tất cả nhóm chat (không phản hồi tin nhắn này)",
+			sendingNotification: "Bắt đầu gửi thông báo từ admin bot đến %1 nhóm chat",
+			sentNotification: "✅ Đã gửi thông báo đến %1 nhóm thành công",
+			errorSendingNotification: "Có lỗi xảy ra khi gửi đến %1 nhóm:\n%2"
+		},
+		en: {
+			missingMessage: "Please enter the message you want to send to all groups",
+			notification: "Notification from admin bot to all chat groups (do not reply to this message)",
+			sendingNotification: "Start sending notification from admin bot to %1 chat groups",
+			sentNotification: "✅ Sent notification to %1 groups successfully",
+			errorSendingNotification: "An error occurred while sending to %1 groups:\n%2"
+		}
+	},
 
-    const isCancel = body.toLowerCase().startsWith("c") || body.toLowerCase().startsWith("cancel");
-    const indices = body.replace(/^[cC]ancel?\s*/, "").split(/\s+/);
+	onStart: async function ({ message, api, event, args, commandName, envCommands, threadsData, getLang }) {
+		const { delayPerGroup } = envCommands[commandName];
+		if (!args[0])
+			return message.reply(getLang("missingMessage"));
+		const formSend = {
+			body: `${getLang("notification")}\n────────────────\n${args.join(" ")}`,
+			attachment: await getStreamsFromAttachment(
+				[
+					...event.attachments,
+					...(event.messageReply?.attachments || [])
+				].filter(item => ["photo", "png", "animated_image", "video", "audio"].includes(item.type))
+			)
+		};
 
-    for (const index of indices) {
-      const num = parseInt(index);
-      if (isNaN(num) || num <= 0 || num > Reply.pending.length) {
-        return api.sendMessage(getLang("invalidNumber", num), threadID, messageID);
-      }
+		const allThreadID = (await threadsData.getAll()).filter(t => t.isGroup && t.members.find(m => m.userID == api.getCurrentUserID())?.inGroup);
+		message.reply(getLang("sendingNotification", allThreadID.length));
 
-      if (isCancel) {
-        api.removeUserFromGroup(api.getCurrentUserID(), Reply.pending[num - 1].threadID);
-      } else {
-        const prefix = global.utils.getPrefix(Reply.pending[num - 1].threadID); // Prefix Get
+		let sendSucces = 0;
+		const sendError = [];
+		const wattingSend = [];
 
-        api.sendMessage(
-          `╔════════════════╗\n` +
-          `║💻 ᴀᴢᴀᴅ ᴄʜᴀᴛ ʙᴏᴛ 💻\n` +
-          `╚════════════════╝\n\n` +
-          `🗿 𝗧𝗵𝗮𝗻𝗸 𝘆𝗼𝘂 𝗳𝗼𝗿 𝗶𝗻𝘃𝗶𝘁𝗶𝗻𝗴 𝗺𝗲! 🌟\n\n` +
-          `💱 𝗟𝗲𝘁'𝘀 𝗴𝗲𝘁 𝘀𝘁𝗮𝗿𝘁𝗲𝗱!\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `⚔️ 𝗕𝗼𝘁 𝗣𝗿𝗲𝗳𝗶𝘅: 『 ${prefix} 』\n` +
-          `📌 𝗖𝗵𝗲𝗰𝗸 𝗖𝗼𝗺𝗺𝗮𝗻𝗱𝘀: 『 ${prefix}help 』\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `⚒️ 𝗡𝗲𝗲𝗱 𝗛𝗲𝗹𝗽? 𝗝𝘂𝘀𝘁 𝗔𝘀𝗸! 🚀`,
-          Reply.pending[num - 1].threadID
-        );
-      }
-      count++;
-    }
+		for (const thread of allThreadID) {
+			const tid = thread.threadID;
+			try {
+				wattingSend.push({
+					threadID: tid,
+					pending: api.sendMessage(formSend, tid)
+				});
+				await new Promise(resolve => setTimeout(resolve, delayPerGroup));
+			}
+			catch (e) {
+				sendError.push(tid);
+			}
+		}
 
-    return api.sendMessage(getLang(isCancel ? "cancelSuccess" : "approveSuccess", count), threadID, messageID);
-  },
+		for (const sended of wattingSend) {
+			try {
+				await sended.pending;
+				sendSucces++;
+			}
+			catch (e) {
+				const { errorDescription } = e;
+				if (!sendError.some(item => item.errorDescription == errorDescription))
+					sendError.push({
+						threadIDs: [sended.threadID],
+						errorDescription
+					});
+				else
+					sendError.find(item => item.errorDescription == errorDescription).threadIDs.push(sended.threadID);
+			}
+		}
 
-  onStart: async function ({ api, event, getLang, commandName }) { 
-    const { threadID, messageID } = event; 
-    let msg = "", index = 1;
-
-    try {
-      const spam = (await api.getThreadList(100, null, ["OTHER"])) || [];
-      const pending = (await api.getThreadList(100, null, ["PENDING"])) || [];
-      const list = [...spam, ...pending].filter(group => group.isSubscribed && group.isGroup);
-
-      for (const BaYjid of list) {
-        msg += `🔹『${index++}』 ${BaYjid.name} 『${BaYjid.threadID}』\n`;
-      }
-
-      if (list.length !== 0) {
-        return api.sendMessage(getLang("returnListPending", list.length, msg), threadID, (err, info) => {
-          global.GoatBot.onReply.set(info.messageID, {
-            commandName,
-            messageID: info.messageID,
-            author: event.senderID,
-            pending: list
-          });
-        }, messageID);
-      } else {
-        return api.sendMessage(getLang("returnListClean"), threadID, messageID);
-      }
-    } catch (e) {
-      return api.sendMessage(getLang("cantGetPendingList"), threadID, messageID);
-    }
-  }
+		let msg = "";
+		if (sendSucces > 0)
+			msg += getLang("sentNotification", sendSucces) + "\n";
+		if (sendError.length > 0)
+			msg += getLang("errorSendingNotification", sendError.reduce((a, b) => a + b.threadIDs.length, 0), sendError.reduce((a, b) => a + `\n - ${b.errorDescription}\n  + ${b.threadIDs.join("\n  + ")}`, ""));
+		message.reply(msg);
+	}
 };
