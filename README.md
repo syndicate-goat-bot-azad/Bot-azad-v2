@@ -6,11 +6,10 @@
   <sub>By MOHAMMAD Azad | Messenger Chat Bot</sub>
 </h1>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/I%20Am%20BAYJID%20%7C%20BANGLADESHI%20NOOB%20PROGRAMMER-green?colorA=%23ff0000&colorB=%23017e40&style=flat-square">
-</p>
 
-<h3 align="center">
+  <img src="https://img.shie">
+<p>
+">
   <img src="https://emoji.discord.st/emojis/768b108d-274f-4f44-a634-8477b16efce7.gif" width="25">
   &nbsp; Welcome to My Chat Bot &nbsp;
   <img src="https://emoji.discord.st/emojis/768b108d-274f-4f44-a634-8477b16efce7.gif" width="25">
