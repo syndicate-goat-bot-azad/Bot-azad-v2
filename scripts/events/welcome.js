@@ -1,114 +1,154 @@
+// Welcome Event Handler with Dynamic Canvas Card
+// Author: Azad
+
 const { getTime, drive } = global.utils;
+const { createCanvas, loadImage, registerFont } = require("canvas");
+const axios = require("axios");
+const path = require("path");
+const fs = require("fs");
 
 if (!global.temp.welcomeEvent) global.temp.welcomeEvent = {};
 
 module.exports = {
-        config: {
-                name: "welcome",
-                version: "2.0",
-                author: "BaYjid",
-                category: "events"
-        },
+    config: {
+        name: "welcome",
+        version: "4.0",
+        author: "Azad",
+        category: "events"
+    },
 
-        langs: {
-                vi: {
-                        session1: "☀ 𝗦𝗮́𝗻𝗴",
-                        session2: "⛅ 𝗧𝗿𝘂̛𝗮",
-                        session3: "🌆 𝗖𝗵𝗶𝗲̂̀𝘂",
-                        session4: "🌙 𝗧𝗼̂́𝗶",
-                        welcomeMessage: "✨ 𝗖𝗮̉𝗺 𝗼̛𝗻 𝗯𝗮̣𝗻 𝗱𝗮̃ 𝗺𝗼̛̀𝗶 𝘁𝗼̂𝗶 𝘃𝗮̀𝗼 𝗻𝗵𝗼́𝗺!\n⚡ 𝗣𝗿𝗲𝗳𝗶𝘅 𝗯𝗼𝘁: %1\n🔎 Đ𝗲̂̉ 𝘅𝗲𝗺 𝗱𝗮𝗻𝗵 𝘀𝗮́𝗰𝗵 𝗹𝗲̣̂𝗻𝗵 𝗵𝗮̃𝘆 𝗻𝗵𝗮̣̂𝗽: %1help",
-                        multiple1: "🔹 𝗕𝗮̣𝗻",
-                        multiple2: "🔹 𝗖𝗮́𝗰 𝗯𝗮̣𝗻",
-                        defaultWelcomeMessage: "🎉 𝗖𝗵𝗮̀𝗼 𝗺𝘂̛̀𝗻𝗴 {userName} 🎊\n\n🚀 𝗖𝗵𝗮̀𝗼 𝗺𝘂̛̀𝗻𝗴 𝗯𝗮̣𝗻 𝗱𝗲̂́𝗻 𝘃𝗼̛́𝗶 『 {boxName} 』\n🔹 𝗖𝗵𝘂́𝗰 𝗯𝗮̣𝗻 𝗰𝗼́ 𝗯𝘂𝗼̂̉𝗶 {session} 𝘃𝘂𝗶 𝘃𝗲̉! ✨"
-                },
-                en: {
-                        session1: "☀ 𝓜𝓸𝓻𝓷𝓲𝓷𝓰",
-                        session2: "⛅ 𝓝𝓸𝓸𝓷",
-                        session3: "🌆 𝓐𝓯𝓽𝓮𝓻𝓷𝓸𝓸𝓷",
-                        session4: "🌙 𝓔𝓿𝓮𝓷𝓲𝓷𝓰",
-                        welcomeMessage: "𝘼𝙯𝙖𝙙 𝙘𝙝𝙖𝙩 𝙗𝙤𝙩__/:;)🤍\n\n🚀 𝗧𝗵𝗮𝗻𝗸 𝘆𝗼𝘂 𝗳𝗼𝗿 𝗶𝗻𝘃𝗶𝘁𝗶𝗻𝗴 𝗺𝗲!\n⚡ 𝗕𝗼𝘁 𝗣𝗿𝗲𝗳𝗶𝘅: %1\n🔎 𝗧𝗼 𝗰𝗵𝗲𝗰𝗸 𝗮𝗹𝗹 𝗰𝗼𝗺𝗺𝗮𝗻𝗱𝘀, 𝘁𝘆𝗽𝗲: %1help\n\n✨ 𝗛𝗮𝘃𝗲 𝗮 𝗴𝗿𝗲𝗮𝘁 𝘁𝗶𝗺𝗲! ✨",
-                        multiple1: "🔹 𝖸𝗈𝗎",
-                        multiple2: "🔹 𝖸𝗈𝗎 𝖦𝗎𝗒𝗌",
-                        defaultWelcomeMessage: "🎉 『 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 』 🎉\n\n💠 𝗛𝗲𝘆 {userName}!\n🔹 𝗬𝗼𝘂 𝗷𝘂𝘀𝘁 𝗷𝗼𝗶𝗻𝗲𝗱 『 {boxName} 』\n⏳ 𝗧𝗶𝗺𝗲 𝗳𝗼𝗿 𝘀𝗼𝗺𝗲 𝗳𝘂𝗻! 𝗛𝗮𝘃𝗲 𝗮 𝗳𝗮𝗻𝘁𝗮𝘀𝘁𝗶𝗰 {session} 🎊\n\n⚠ 𝗣𝗹𝗲𝗮𝘀𝗲 𝗳𝗼𝗹𝗹𝗼𝘄 𝗮𝗹𝗹 𝗴𝗿𝗼𝘂𝗽 𝗿𝘂𝗹𝗲𝘀! 🚀\n\n👤 𝗔𝗱𝗱𝗲𝗱 𝗯𝘆: {adderName}"
-                }
-        },
+    langs: {
+        // ... same langs as before (vi, en, bn)
+        // shortened here for space, but keep them from previous code
+    },
 
-        onStart: async ({ threadsData, message, event, api, getLang }) => {
-                if (event.logMessageType !== "log:subscribe") return;
+    onStart: async ({ threadsData, message, event, api, getLang }) => {
+        if (event.logMessageType !== "log:subscribe") return;
 
-                const { threadID, logMessageData } = event;
-                const { addedParticipants } = logMessageData;
-                const hours = getTime("HH");
-                const prefix = global.utils.getPrefix(threadID);
-                const nickNameBot = global.GoatBot.config.nickNameBot;
+        const { threadID, logMessageData } = event;
+        const { addedParticipants } = logMessageData;
+        const hours = parseInt(getTime("HH"), 10);
+        const prefix = global.utils.getPrefix(threadID);
+        const nickNameBot = global.GoatBot.config.nickNameBot;
 
-                if (addedParticipants.some(user => user.userFbId === api.getCurrentUserID())) {
-                        if (nickNameBot) api.changeNickname(nickNameBot, threadID, api.getCurrentUserID());
-                        return message.send(getLang("welcomeMessage", prefix));
-                }
-
-                if (!global.temp.welcomeEvent[threadID]) {
-                        global.temp.welcomeEvent[threadID] = { joinTimeout: null, dataAddedParticipants: [] };
-                }
-
-                global.temp.welcomeEvent[threadID].dataAddedParticipants.push(...addedParticipants);
-
-                clearTimeout(global.temp.welcomeEvent[threadID].joinTimeout);
-
-                global.temp.welcomeEvent[threadID].joinTimeout = setTimeout(async () => {
-                        const threadData = await threadsData.get(threadID);
-                        if (threadData.settings.sendWelcomeMessage === false) return;
-
-                        const dataAddedParticipants = global.temp.welcomeEvent[threadID].dataAddedParticipants;
-                        const bannedUsers = threadData.data.banned_ban || [];
-                        const threadName = threadData.threadName;
-
-                        let newMembers = [], mentions = [];
-                        let isMultiple = dataAddedParticipants.length > 1;
-
-                        for (const user of dataAddedParticipants) {
-                                if (bannedUsers.some(banned => banned.id === user.userFbId)) continue;
-                                newMembers.push(user.fullName);
-                                mentions.push({ tag: user.fullName, id: user.userFbId });
-                        }
-
-                        if (newMembers.length === 0) return;
-
-                        // Get info of the adder
-                        const adderID = event.author;
-                        const adderInfo = await api.getUserInfo(adderID);
-                        const adderName = adderInfo[adderID]?.name || "Someone";
-                        mentions.push({ tag: adderName, id: adderID });
-
-                        let welcomeMessage = threadData.data.welcomeMessage || getLang("defaultWelcomeMessage");
-
-                        welcomeMessage = welcomeMessage
-                                .replace(/\{userName\}|\{userNameTag\}/g, newMembers.join(", "))
-                                .replace(/\{boxName\}|\{threadName\}/g, threadName)
-                                .replace(/\{multiple\}/g, isMultiple ? getLang("multiple2") : getLang("multiple1"))
-                                .replace(/\{session\}/g,
-                                        hours <= 10 ? getLang("session1") :
-                                        hours <= 12 ? getLang("session2") :
-                                        hours <= 18 ? getLang("session3") : getLang("session4")
-                                )
-                                .replace(/\{adderName\}/g, adderName);
-
-                        let form = {
-                                body: welcomeMessage,
-                                mentions: mentions
-                        };
-
-                        if (threadData.data.welcomeAttachment) {
-                                const files = threadData.data.welcomeAttachment;
-                                const attachments = files.map(file => drive.getFile(file, "stream"));
-
-                                form.attachment = (await Promise.allSettled(attachments))
-                                        .filter(({ status }) => status === "fulfilled")
-                                        .map(({ value }) => value);
-                        }
-
-                        message.send(form);
-                        delete global.temp.welcomeEvent[threadID];
-                }, 1500);
+        if (addedParticipants.some(u => u.userFbId === api.getCurrentUserID())) {
+            if (nickNameBot) api.changeNickname(nickNameBot, threadID, api.getCurrentUserID());
+            return message.send(getLang("welcomeMessage", prefix));
         }
+
+        if (!global.temp.welcomeEvent[threadID]) {
+            global.temp.welcomeEvent[threadID] = { joinTimeout: null, dataAddedParticipants: [] };
+        }
+
+        global.temp.welcomeEvent[threadID].dataAddedParticipants.push(...addedParticipants);
+        clearTimeout(global.temp.welcomeEvent[threadID].joinTimeout);
+
+        global.temp.welcomeEvent[threadID].joinTimeout = setTimeout(async () => {
+            const threadData = await threadsData.get(threadID) || {};
+            if (threadData?.settings?.sendWelcomeMessage === false) return;
+
+            const dataAddedParticipants = global.temp.welcomeEvent[threadID].dataAddedParticipants;
+            const bannedUsers = threadData?.data?.banned_ban || [];
+            const threadName = threadData?.threadName || "this group";
+
+            let newMembers = [], mentions = [];
+            const isMultiple = dataAddedParticipants.length > 1;
+
+            for (const user of dataAddedParticipants) {
+                if (bannedUsers.some(b => b.id === user.userFbId)) continue;
+                newMembers.push(user.fullName);
+                mentions.push({ tag: user.fullName, id: user.userFbId });
+            }
+
+            if (!newMembers.length) return;
+
+            const adderID = event.author;
+            const adderInfo = await api.getUserInfo(adderID).catch(() => ({}));
+            const adderName = adderInfo?.[adderID]?.name || "Someone";
+
+            if (!newMembers.includes(adderName)) {
+                mentions.push({ tag: adderName, id: adderID });
+            }
+
+            const session = hours < 11 ? getLang("session1") :
+                            hours < 13 ? getLang("session2") :
+                            hours < 19 ? getLang("session3") : getLang("session4");
+
+            let welcomeMessage = threadData?.data?.welcomeMessage || getLang("defaultWelcomeMessage");
+            welcomeMessage = welcomeMessage
+                .replace(/\{userName\}|\{userNameTag\}/g, newMembers.join(", "))
+                .replace(/\{boxName\}|\{threadName\}/g, threadName)
+                .replace(/\{multiple\}/g, isMultiple ? getLang("multiple2") : getLang("multiple1"))
+                .replace(/\{session\}/g, session)
+                .replace(/\{adderName\}/g, adderName);
+
+            // === Dynamic Welcome Card Creation ===
+            const canvas = createCanvas(1000, 400);
+            const ctx = canvas.getContext("2d");
+
+            // Gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 1000, 400);
+            gradient.addColorStop(0, "#4facfe");
+            gradient.addColorStop(1, "#00f2fe");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Load profile picture of first member
+            let avatarUrl = `https://graph.facebook.com/${dataAddedParticipants[0].userFbId}/picture?width=512&height=512`;
+            const avatarImg = await loadImage((await axios.get(avatarUrl, { responseType: "arraybuffer" })).data);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(200, 200, 120, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(avatarImg, 80, 80, 240, 240);
+            ctx.restore();
+
+            // Text Styles
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 40px Arial";
+            ctx.fillText("Welcome", 400, 150);
+
+            ctx.font = "bold 30px Arial";
+            ctx.fillText(newMembers.join(", "), 400, 210);
+
+            ctx.font = "28px Arial";
+            ctx.fillText(`To ${threadName}`, 400, 260);
+
+            ctx.font = "25px Arial";
+            ctx.fillText(`Have a great ${session}!`, 400, 310);
+
+            // Save image to temp file
+            const imgPath = path.join(__dirname, "welcome_card.png");
+            const out = fs.createWriteStream(imgPath);
+            const stream = canvas.createPNGStream();
+            stream.pipe(out);
+            await new Promise(resolve => out.on("finish", resolve));
+
+            // Prepare form
+            let form = {
+                body: welcomeMessage,
+                mentions,
+                attachment: fs.createReadStream(imgPath)
+            };
+
+            // Add saved attachments from settings if available
+            if (threadData?.data?.welcomeAttachment) {
+                const files = threadData.data.welcomeAttachment;
+                const attachments = files.map(file => drive.getFile(file, "stream"));
+                const extra = (await Promise.allSettled(attachments))
+                    .filter(r => r.status === "fulfilled")
+                    .map(r => r.value);
+                form.attachment = [fs.createReadStream(imgPath), ...extra];
+            }
+
+            // Send welcome message with image
+            message.send(form);
+
+            // Clean temp file
+            setTimeout(() => fs.unlinkSync(imgPath), 5000);
+
+            delete global.temp.welcomeEvent[threadID];
+        }, 1500);
+    }
 };
