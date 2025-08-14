@@ -27,8 +27,8 @@ module.exports = {
     }
 
     // মালিকের আইডি চেক
-    if (replyUser === "100068909067279") {
-      return message.reply("You deserve this, not my owner! 😙");
+    if (replyUser === "61578365162382") {
+      return message.reply("bkc You deserve this, not my owner! 😙");
     }
 
     bal(replyUser).then(ptth => {
