@@ -1,46 +1,117 @@
-module.exports = {
-  config: {
+const axios = require('axios');
+const dipto = "https://www.noobs-api.rf.gd/dipto";
+
+module.exports.config = {
     name: "edit",
-    aliases: [],
-    role: 0,
-    author: "ChatGpt",
+    version: "6.9",
+    author: "dipto",
     countDown: 5,
-    longDescription: "",
-    category: "image",
+    role: 2,
+    category: "ai",
+    description: "Edit images using Edit AI",
     guide: {
-      en: "/edit make this image black white"
+        en: "Reply to an image with {pn} [prompt]"
     }
-  },
-  onStart: async function ({ message, api, args, event }) {
-    if (!event.messageReply || !event.messageReply.attachments || !event.messageReply.attachments[0]) {
-      return message.reply("📸| Please reply to an image to edit it.");
+};
+
+async function handleEdit(api, event, args, commandName) {
+    const url = event.messageReply?.attachments[0]?.url;
+    const prompt = args.join(" ") || "What is this";
+
+    if (!url) {
+        return api.sendMessage("❌ Please reply to an image to edit it.", event.threadID, event.messageID);
     }
 
-    if (!args[0]) {
-      return message.reply("📝| Please provide a prompt.");
-    }
-
-    const prompt = encodeURIComponent(args.join(" "));
-    const imgurl = encodeURIComponent(event.messageReply.attachments[0].url);
-    const geditUrl = `https://smfahim.xyz/gedit?prompt=${prompt}&url=${imgurl}`;
-
-    api.setMessageReaction("🦆", event.messageID, () => {}, true);
-
-    message.reply("🦆| Editing image, please wait...", async (err, info) => {
-      try {
-        const attachment = await global.utils.getStreamFromURL(geditUrl);
-        message.reply({ 
-          body: `🔥| Here is your edited image!`, 
-          attachment: attachment 
+    try {
+        const response = await axios.get(`${dipto}/edit?url=${encodeURIComponent(url)}&prompt=${encodeURIComponent(prompt)}`, {
+            responseType: 'stream',
+            validateStatus: () => true
         });
 
-        let ui = info.messageID;          
-        message.unsend(ui);
-        api.setMessageReaction("🌚", event.messageID, () => {}, true);
-      } catch (error) {
-        message.reply("📛| There was an error editing your image.");
-        console.error(error);
-      }
-    });
-  }
+        // Check if response is image
+        if (response.headers['content-type']?.startsWith('image/')) {
+            return api.sendMessage(
+                { attachment: response.data },
+                event.threadID,
+                (error, info) => {
+                    global.GoatBot.onReply.set(info.messageID, {
+                        commandName: commandName,
+                        type: "reply",
+                        messageID: info.messageID,
+                        author: event.senderID,
+                    });
+                },
+                event.messageID
+            );
+        }
+
+        // If not image, try to parse as JSON
+        let responseData = '';
+        for await (const chunk of response.data) {
+            responseData += chunk.toString();
+        }
+
+        const jsonData = JSON.parse(responseData);
+        if (jsonData?.response) {
+            return api.sendMessage(
+                jsonData.response,
+                event.threadID,
+                (error, info) => {
+                    global.GoatBot.onReply.set(info.messageID, {
+                        commandName: commandName,
+                        type: "reply",
+                        messageID: info.messageID,
+                        author: event.senderID,
+                    });
+                },
+                event.messageID
+            );
+        }
+
+        return api.sendMessage(
+            "❌ No valid response from the API",
+            event.threadID,
+            (error, info) => {
+                global.GoatBot.onReply.set(info.messageID, {
+                    commandName: commandName,
+                    type: "reply",
+                    messageID: info.messageID,
+                    author: event.senderID,
+                });
+            },
+            event.messageID
+        );
+
+    } catch (error) {
+        console.error("Edit command error:", error);
+        return api.sendMessage(
+            "❌ Failed to process your request. Please try again later.",
+            event.threadID,
+            (error, info) => {
+                global.GoatBot.onReply.set(info.messageID, {
+                    commandName: commandName,
+                    type: "reply",
+                    messageID: info.messageID,
+                    author: event.senderID,
+                });
+            },
+            event.messageID
+        );
+    }
+}
+
+module.exports.onStart = async ({ api, event, args }) => {
+    if (!event.messageReply) {
+        return api.sendMessage(
+            "❌ Please reply to an image to edit it.",
+            event.threadID,
+            event.messageID);
+    }
+    await handleEdit(api, event, args, this.config.name);
+};
+
+module.exports.onReply = async function ({ api, event, args }) {
+    if (event.type === "message_reply") {
+        await handleEdit(api, event, args, this.config.name);
+    }
 };
